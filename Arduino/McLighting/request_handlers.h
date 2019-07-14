@@ -52,6 +52,24 @@ void getArgs() {
     main_color.red = ((rgb >> 16) & 0xFF);
     main_color.green = ((rgb >> 8) & 0xFF);
     main_color.blue = ((rgb >> 0) & 0xFF);
+  } else if (server.arg("lox") != "") {
+    uint32_t loxColor = server.arg("lox").toInt();
+
+    uint32_t blue = constrain(round(loxColor / 1000000), 0, 100);
+    uint32_t green = constrain(round((loxColor - blue * 1000000) / 1000), 0, 100);
+    uint32_t red = constrain(loxColor - blue * 1000000 - green * 1000, 0, 100);
+
+    DBG_OUTPUT_PORT.print("Lox: B: ");
+    DBG_OUTPUT_PORT.print(blue);
+    DBG_OUTPUT_PORT.print(" G: ");
+    DBG_OUTPUT_PORT.print(green);
+    DBG_OUTPUT_PORT.print(" R: ");
+    DBG_OUTPUT_PORT.println(red);
+
+    // 0-100 -> 0-255
+    main_color.red = map(red, 0, 100, 0, 255);
+    main_color.green = map(green, 0, 100, 0, 255);
+    main_color.blue = map(blue, 0, 100, 0, 255);
   } else {
     main_color.red = server.arg("r").toInt();
     main_color.green = server.arg("g").toInt();
@@ -65,7 +83,7 @@ void getArgs() {
   if (server.arg("m") != "") {
     ws2812fx_mode = constrain(server.arg("m").toInt(), 0, strip->getModeCount() - 1);
   }
-  
+
   if (server.arg("c").toInt() > 0) {
     brightness = constrain((int) server.arg("c").toInt() * 2.55, 0, 255);
   } else if (server.arg("p").toInt() > 0) {
@@ -246,7 +264,7 @@ void setModeByStateString(String saved_state_string) {
 #ifdef ENABLE_LEGACY_ANIMATIONS
   void handleSetNamedMode(String str_mode) {
     exit_func = true;
-  
+
     if (str_mode.startsWith("=off")) {
       mode = OFF;
       #ifdef ENABLE_HOMEASSISTANT
@@ -326,7 +344,7 @@ void handleSetWS2812FXMode(uint8_t * mypayload) {
 
 String listStatusJSON(void) {
   uint8_t tmp_mode = (mode == SET_MODE) ? (uint8_t) ws2812fx_mode : strip->getMode();
-  
+
   const size_t bufferSize = JSON_ARRAY_SIZE(3) + JSON_OBJECT_SIZE(6) + 500;
   DynamicJsonDocument jsonBuffer(bufferSize);
   JsonObject root = jsonBuffer.to<JsonObject>();
@@ -339,10 +357,10 @@ String listStatusJSON(void) {
   color.add(main_color.red);
   color.add(main_color.green);
   color.add(main_color.blue);
-  
+
   String json;
   serializeJson(root, json);
-  
+
   return json;
 }
 
@@ -366,7 +384,7 @@ String listModesJSON(void) {
     object["name"] = strip->getModeName(i);
   }
   JsonObject object = json.createNestedObject();
-  
+
   String json_str;
   serializeJson(json, json_str);
   return json_str;
@@ -451,7 +469,7 @@ void checkpayload(uint8_t * payload, bool mqtt = false, uint8_t num = 0) {
   if (payload[0] == '#') {
     handleSetMainColor(payload);
     if (mqtt == true)  {
-      DBG_OUTPUT_PORT.print("MQTT: "); 
+      DBG_OUTPUT_PORT.print("MQTT: ");
     } else {
       DBG_OUTPUT_PORT.print("WS: ");
       webSocket.sendTXT(num, "OK");
@@ -478,7 +496,7 @@ void checkpayload(uint8_t * payload, bool mqtt = false, uint8_t num = 0) {
     ws2812fx_speed = constrain(d, 0, 255);
     mode = SETSPEED;
     if (mqtt == true)  {
-      DBG_OUTPUT_PORT.print("MQTT: "); 
+      DBG_OUTPUT_PORT.print("MQTT: ");
     } else {
       DBG_OUTPUT_PORT.print("WS: ");
       webSocket.sendTXT(num, "OK");
@@ -502,7 +520,7 @@ void checkpayload(uint8_t * payload, bool mqtt = false, uint8_t num = 0) {
     brightness = constrain(b, 0, 255);
     mode = BRIGHTNESS;
     if (mqtt == true)  {
-      DBG_OUTPUT_PORT.print("MQTT: "); 
+      DBG_OUTPUT_PORT.print("MQTT: ");
     } else {
       DBG_OUTPUT_PORT.print("WS: ");
       webSocket.sendTXT(num, "OK");
@@ -527,7 +545,7 @@ void checkpayload(uint8_t * payload, bool mqtt = false, uint8_t num = 0) {
   if (payload[0] == '*') {
     handleSetAllMode(payload);
     if (mqtt == true)  {
-      DBG_OUTPUT_PORT.print("MQTT: "); 
+      DBG_OUTPUT_PORT.print("MQTT: ");
     } else {
       DBG_OUTPUT_PORT.print("WS: ");
       webSocket.sendTXT(num, "OK");
@@ -552,7 +570,7 @@ void checkpayload(uint8_t * payload, bool mqtt = false, uint8_t num = 0) {
   if (payload[0] == '!') {
     handleSetSingleLED(payload, 1);
     if (mqtt == true)  {
-      DBG_OUTPUT_PORT.print("MQTT: "); 
+      DBG_OUTPUT_PORT.print("MQTT: ");
     } else {
       DBG_OUTPUT_PORT.print("WS: ");
       webSocket.sendTXT(num, "OK");
@@ -570,7 +588,7 @@ void checkpayload(uint8_t * payload, bool mqtt = false, uint8_t num = 0) {
   if (payload[0] == '+') {
     handleSetDifferentColors(payload);
     if (mqtt == true)  {
-      DBG_OUTPUT_PORT.print("MQTT: "); 
+      DBG_OUTPUT_PORT.print("MQTT: ");
     } else {
       DBG_OUTPUT_PORT.print("WS: ");
       webSocket.sendTXT(num, "OK");
@@ -588,7 +606,7 @@ void checkpayload(uint8_t * payload, bool mqtt = false, uint8_t num = 0) {
   if (payload[0] == 'R') {
     handleRangeDifferentColors(payload);
     if (mqtt == true)  {
-      DBG_OUTPUT_PORT.print("MQTT: "); 
+      DBG_OUTPUT_PORT.print("MQTT: ");
     } else {
       DBG_OUTPUT_PORT.print("WS: ");
       webSocket.sendTXT(num, "OK");
@@ -614,7 +632,7 @@ void checkpayload(uint8_t * payload, bool mqtt = false, uint8_t num = 0) {
       handleE131NamedMode(str_mode);
       #endif
       if (mqtt == true)  {
-        DBG_OUTPUT_PORT.print("MQTT: "); 
+        DBG_OUTPUT_PORT.print("MQTT: ");
       } else {
         DBG_OUTPUT_PORT.print("WS: ");
         webSocket.sendTXT(num, "OK");
@@ -658,7 +676,7 @@ void checkpayload(uint8_t * payload, bool mqtt = false, uint8_t num = 0) {
   if (payload[0] == '~') {
     String json = listModesJSON();
     if (mqtt == true)  {
-      DBG_OUTPUT_PORT.print("MQTT: "); 
+      DBG_OUTPUT_PORT.print("MQTT: ");
       #ifdef ENABLE_MQTT
         // TODO: Fix this, doesn't return anything. Too long?
         // Hint: https://github.com/knolleary/pubsubclient/issues/110
@@ -666,7 +684,7 @@ void checkpayload(uint8_t * payload, bool mqtt = false, uint8_t num = 0) {
         mqtt_client.publish(mqtt_outtopic, "ERROR: Not implemented. Message too large for pubsubclient.");
         //String json_modes = listModesJSON();
         //DBG_OUTPUT_PORT.printf(json_modes.c_str());
-    
+
         //int res = mqtt_client.publish(mqtt_outtopic, json_modes.c_str(), json_modes.length());
         //DBG_OUTPUT_PORT.printf("Result: %d / %d", res, json_modes.length());
       #endif
@@ -690,7 +708,7 @@ void checkpayload(uint8_t * payload, bool mqtt = false, uint8_t num = 0) {
     handleE131NamedMode(str_mode);
     #endif
     if (mqtt == true)  {
-      DBG_OUTPUT_PORT.print("MQTT: "); 
+      DBG_OUTPUT_PORT.print("MQTT: ");
     } else {
       DBG_OUTPUT_PORT.print("WS: ");
       webSocket.sendTXT(num, "OK");
@@ -878,7 +896,7 @@ void checkForRequests() {
       }
       //DBG_OUTPUT_PORT.println("JSON ParseObject() done!");
       JsonObject root = jsonBuffer.as<JsonObject>();
-      
+
       if (root.containsKey("state")) {
         const char* state_in = root["state"];
         if (strcmp(state_in, on_cmd) == 0 and !(animation_on)) {
@@ -1305,7 +1323,7 @@ bool writeConfigFS(bool saveConfig){
     json["mqtt_port"] = mqtt_port;
     json["mqtt_user"] = mqtt_user;
     json["mqtt_pass"] = mqtt_pass;
-  
+
     //SPIFFS.remove("/config.json") ? DBG_OUTPUT_PORT.println("removed file") : DBG_OUTPUT_PORT.println("failed removing file");
     File configFile = SPIFFS.open("/config.json", "w");
     if (!configFile) DBG_OUTPUT_PORT.println("failed to open config file for writing");
@@ -1436,7 +1454,7 @@ bool readStateFS() {
           strip->stop();
         }
         #endif
-        
+
         updateFS = false;
         return true;
       } else {
