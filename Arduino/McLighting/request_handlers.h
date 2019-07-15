@@ -1197,120 +1197,26 @@ void checkForRequests() {
   #endif
 #endif
 
-
 // ***************************************************************************
 // Button management
 // ***************************************************************************
-#ifdef ENABLE_BUTTON
-  void shortKeyPress() {
-    DBG_OUTPUT_PORT.printf("Short button press\n");
-    if (buttonState == false) {
-      setModeByStateString(BTN_MODE_SHORT);
-      buttonState = true;
-      #ifdef ENABLE_MQTT
-        mqtt_client.publish(mqtt_outtopic, String("OK =static white").c_str());
-      #endif
-      #ifdef ENABLE_AMQTT
-        amqttClient.publish(mqtt_outtopic, qospub, false, String("OK =static white").c_str());
-      #endif
-      #ifdef ENABLE_HOMEASSISTANT
-        stateOn = true;
-        if(!ha_send_data.active())  ha_send_data.once(5, tickerSendState);
-      #endif
-      #ifdef ENABLE_STATE_SAVE_SPIFFS
-        if(!spiffs_save_state.active()) spiffs_save_state.once(3, tickerSpiffsSaveState);
-      #endif
-    } else {
-      mode = OFF;
-      buttonState = false;
-      #ifdef ENABLE_MQTT
-        mqtt_client.publish(mqtt_outtopic, String("OK =off").c_str());
-      #endif
-      #ifdef ENABLE_AMQTT
-        amqttClient.publish(mqtt_outtopic, qospub, false, String("OK =off").c_str());
-      #endif
-      #ifdef ENABLE_HOMEASSISTANT
-        stateOn = false;
-        if(!ha_send_data.active())  ha_send_data.once(5, tickerSendState);
-      #endif
-      #ifdef ENABLE_STATE_SAVE_SPIFFS
-        if(!spiffs_save_state.active()) spiffs_save_state.once(3, tickerSpiffsSaveState);
-      #endif
-    }
+#ifdef ENABLE_BUTTONS
+  void button1() {
+    Udp.beginPacket(udp_host, atoi(udp_port));
+    Udp.write(button1Packet);
+    Udp.endPacket();
   }
 
-  // called when button is kept pressed for less than 2 seconds
-  void mediumKeyPress() {
-    DBG_OUTPUT_PORT.printf("Medium button press\n");
-    setModeByStateString(BTN_MODE_MEDIUM);
-    #ifdef ENABLE_MQTT
-      mqtt_client.publish(mqtt_outtopic, String("OK =fire flicker").c_str());
-    #endif
-    #ifdef ENABLE_AMQTT
-      amqttClient.publish(mqtt_outtopic, qospub, false, String("OK =fire flicker").c_str());
-    #endif
-    #ifdef ENABLE_HOMEASSISTANT
-      stateOn = true;
-      if(!ha_send_data.active())  ha_send_data.once(5, tickerSendState);
-    #endif
-    #ifdef ENABLE_STATE_SAVE_SPIFFS
-      if(!spiffs_save_state.active()) spiffs_save_state.once(3, tickerSpiffsSaveState);
-    #endif
-  }
-
-  // called when button is kept pressed for 2 seconds or more
-  void longKeyPress() {
-    DBG_OUTPUT_PORT.printf("Long button press\n");
-    setModeByStateString(BTN_MODE_LONG);
-    #ifdef ENABLE_MQTT
-      mqtt_client.publish(mqtt_outtopic, String("OK =fireworks random").c_str());
-    #endif
-    #ifdef ENABLE_AMQTT
-      amqttClient.publish(mqtt_outtopic, qospub, false, String("OK =fireworks random").c_str());
-    #endif
-    #ifdef ENABLE_HOMEASSISTANT
-     stateOn = true;
-     if(!ha_send_data.active())  ha_send_data.once(5, tickerSendState);
-    #endif
-    #ifdef ENABLE_STATE_SAVE_SPIFFS
-      if(!spiffs_save_state.active()) spiffs_save_state.once(3, tickerSpiffsSaveState);
-    #endif
-  }
-
-  void button() {
-    if (millis() - keyPrevMillis >= keySampleIntervalMs) {
-      keyPrevMillis = millis();
-
-      byte currKeyState = digitalRead(BUTTON);
-
-      if ((prevKeyState == HIGH) && (currKeyState == LOW)) {
-        // key goes from not pressed to pressed
-        KeyPressCount = 0;
-      }
-      else if ((prevKeyState == LOW) && (currKeyState == HIGH)) {
-        if (KeyPressCount < longKeyPressCountMax && KeyPressCount >= mediumKeyPressCountMin) {
-          mediumKeyPress();
-        }
-        else {
-          if (KeyPressCount < mediumKeyPressCountMin) {
-            shortKeyPress();
-          }
-        }
-      }
-      else if (currKeyState == LOW) {
-        KeyPressCount++;
-        if (KeyPressCount >= longKeyPressCountMax) {
-          longKeyPress();
-        }
-      }
-      prevKeyState = currKeyState;
-    }
+  void button2() {
+    Udp.beginPacket(udp_host, atoi(udp_port));
+    Udp.write(button2Packet);
+    Udp.endPacket();
   }
 #endif
 
 #ifdef ENABLE_STATE_SAVE_SPIFFS
 bool updateFS = false;
-#if defined(ENABLE_MQTT) or defined(ENABLE_AMQTT)
+#if defined(ENABLE_MQTT) or defined(ENABLE_AMQTT) or defined(ENABLE_BUTTONS)
 // Write configuration to FS JSON
 bool writeConfigFS(bool saveConfig){
   if (saveConfig) {
@@ -1319,10 +1225,18 @@ bool writeConfigFS(bool saveConfig){
     DBG_OUTPUT_PORT.print("Saving config: ");
     DynamicJsonDocument jsonBuffer(200);
     JsonObject json = jsonBuffer.to<JsonObject>();
-    json["mqtt_host"] = mqtt_host;
-    json["mqtt_port"] = mqtt_port;
-    json["mqtt_user"] = mqtt_user;
-    json["mqtt_pass"] = mqtt_pass;
+
+    #if defined(ENABLE_MQTT) or defined(ENABLE_AMQTT)
+      json["mqtt_host"] = mqtt_host;
+      json["mqtt_port"] = mqtt_port;
+      json["mqtt_user"] = mqtt_user;
+      json["mqtt_pass"] = mqtt_pass;
+    #endif
+
+    #if defined(ENABLE_BUTTONS)
+      json["udp_host"] = udp_host;
+      json["udp_port"] = udp_port;
+    #endif
 
     //SPIFFS.remove("/config.json") ? DBG_OUTPUT_PORT.println("removed file") : DBG_OUTPUT_PORT.println("failed removing file");
     File configFile = SPIFFS.open("/config.json", "w");
@@ -1360,10 +1274,19 @@ bool readConfigFS() {
         DBG_OUTPUT_PORT.println(" Parsed!");
         JsonObject json = jsonBuffer.as<JsonObject>();
         serializeJson(json, DBG_OUTPUT_PORT);
-        strcpy(mqtt_host, json["mqtt_host"]);
-        strcpy(mqtt_port, json["mqtt_port"]);
-        strcpy(mqtt_user, json["mqtt_user"]);
-        strcpy(mqtt_pass, json["mqtt_pass"]);
+
+        #if defined(ENABLE_MQTT) or defined(ENABLE_AMQTT)
+          strcpy(mqtt_host, json["mqtt_host"]);
+          strcpy(mqtt_port, json["mqtt_port"]);
+          strcpy(mqtt_user, json["mqtt_user"]);
+          strcpy(mqtt_pass, json["mqtt_pass"]);
+        #endif
+
+        #if defined(ENABLE_BUTTONS)
+          strcpy(udp_host, json["udp_host"]);
+          strcpy(udp_port, json["udp_port"]);
+        #endif
+
         updateFS = false;
         return true;
       } else {

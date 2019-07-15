@@ -4,7 +4,7 @@
 
 McLighting (the multi-client lighting gadget) is a very cheap internet-controllable lighting solution based on the famous ESP8266 microcontroller and WS2811/2812 led strips. It features among other things a web-interface, a REST-API and a websocket connector.
 
-Because of it's open architecture and APIs it's easy to build new clients for different platforms (iOS, Android, Windows Universal Apps, Siri/Cortana integration, ...). 
+Because of it's open architecture and APIs it's easy to build new clients for different platforms (iOS, Android, Windows Universal Apps, Siri/Cortana integration, ...).
 
 [![Demo video WebClient](https://j.gifs.com/kRPrzN.gif)](https://youtu.be/rc6QVHKAXBs)
 
@@ -24,7 +24,7 @@ For a detailed explanation see our wiki: [Hardware](../../wiki/Hardware)
 
 ## Software installation
 
-You can read how to get started on the software side of this project 
+You can read how to get started on the software side of this project
 again in out wiki: [Software installation](../../wiki/Software-installation)
 
 ---
@@ -41,9 +41,11 @@ This project uses libraries and code by different authors:
 
 - [Adafruit NeoPixel](https://github.com/adafruit/Adafruit_NeoPixel) by adafruit (tested with 1.1.2)
 
+- [Bounce2](https://github.com/thomasfredericks/Bounce2) by thomasfredericks (tested with 2.52)
+
 - Optional: [PubSubClient](https://github.com/knolleary/pubsubclient/) by knolleary (tested with 2.6.0)
   _Only when you have activated MQTT in definitions.h._
-  
+
 The sketch also uses the following built-in library:
 - Ticker by [@igrr](https://github.com/igrr)
 
@@ -52,7 +54,7 @@ Parts of the code were taken or inspired by the following sources:
 - [HSB3RGB conversion](https://blog.adafruit.com/2012/03/14/constant-brightness-hsb-to-rgb-algorithm/)
 
 - [TV simulator](https://github.com/BulldogLowell/PhoneyTV) logic inspired by BulldogLowell
-  
+
 - [SPIFFS Webserver](https://github.com/esp8266/Arduino/tree/master/libraries/ESP8266WebServer/examples/FSBrowser) by Hristo Gochkov
 
 Thank you to all the authors for distributing their software that way.

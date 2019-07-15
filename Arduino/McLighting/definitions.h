@@ -7,7 +7,8 @@
 #define NUMLEDS 24       // Number of leds in the strip
 //#define LED_TYPE_WS2811  // Uncomment if LED type uses 400 KHz (classic 'v1' (not v2) FLORA pixels, WS2811 drivers)
 #define BUILTIN_LED 2    // ESP-12F has the built in LED on GPIO2, see https://github.com/esp8266/Arduino/issues/2192
-#define BUTTON 4         // Input pin (4 / D2) for switching the LED strip on / off, connect this PIN to ground to trigger button.
+#define BUTTON_1 4         // Input pin (4 / D2) for switching the LED strip on / off, connect this PIN to ground to trigger button.
+#define BUTTON_2 5         // Input pin (4 / D2) for switching the LED strip on / off, connect this PIN to ground to trigger button.
 
 #define HOSTNAME "LoxMcLighting01"   // Friedly hostname
 
@@ -16,7 +17,7 @@
 //#define ENABLE_AMQTT         // If defined, enable Async MQTT code, see: https://github.com/marvinroger/async-mqtt-client
 //#define ENABLE_MQTT        // If defined, enable MQTT client code, see: https://github.com/toblum/McLighting/wiki/MQTT-API
 //#define ENABLE_HOMEASSISTANT // If defined, enable Homeassistant integration, ENABLE_MQTT or ENABLE_AMQTT must be active
-#define ENABLE_BUTTON        // If defined, enable button handling code, see: https://github.com/toblum/McLighting/wiki/Button-control
+#define ENABLE_BUTTONS        // If defined, enable button handling code, see: https://github.com/toblum/McLighting/wiki/Button-control
 //#define MQTT_HOME_ASSISTANT_SUPPORT // If defined, use AMQTT and select Tools -> IwIP Variant -> Higher Bandwidth
 #define ENABLE_LEGACY_ANIMATIONS // Dont disbale this for now
 #define ENABLE_E131              // E1.31 implementation
@@ -162,17 +163,10 @@ LEDState main_color = { 255, 0, 0 };  // Store the "main color" of the strip use
   bool updateStateFS = false;
 #endif
 
-// Button handling
-#ifdef ENABLE_BUTTON
-  #define BTN_MODE_SHORT "STA| 1|  0|245|196|255|255|255"   // Static white
-  #define BTN_MODE_MEDIUM "STA| 1| 48|245|196|255|102|  0"    // Fire flicker
-  #define BTN_MODE_LONG "STA| 1| 46|253|196|255|102|  0"  // Fireworks random
+#ifdef ENABLE_BUTTONS
+  char udp_host[64] = "";
+  char udp_port[6] = "5500";
 
-  unsigned long keyPrevMillis = 0;
-  const unsigned long keySampleIntervalMs = 25;
-  byte longKeyPressCountMax = 80;       // 80 * 25 = 2000 ms
-  byte mediumKeyPressCountMin = 20;     // 20 * 25 = 500 ms
-  byte KeyPressCount = 0;
-  byte prevKeyState = HIGH;             // button is active low
-  boolean buttonState = false;
+  char button1Packet[] = "button1";
+  char button2Packet[] = "button2";
 #endif

@@ -19,9 +19,16 @@
 #include <WebSocketsServer.h>
 
 // OTA
-#ifdef ENABLE_OTA
+#if defined(ENABLE_OTA) or defined(ENABLE_BUTTONS)
   #include <WiFiUdp.h>
+#endif
+
+#ifdef ENABLE_OTA
   #include <ArduinoOTA.h>
+#endif
+
+#ifdef ENABLE_BUTTONS
+  #include <Bounce2.h>
 #endif
 
 //SPIFFS Save
@@ -65,7 +72,13 @@
 #endif
 
 #ifdef USE_HTML_MIN_GZ
-#include "html_gz.h" 
+#include "html_gz.h"
+#endif
+
+#ifdef ENABLE_BUTTONS
+  WiFiUDP Udp;
+  Bounce debouncer1 = Bounce();
+  Bounce debouncer2 = Bounce();
 #endif
 
 // ***************************************************************************
@@ -91,7 +104,7 @@ WS2812FX* strip;
 #include <NeoPixelBus.h>
 
 #ifdef USE_WS2812FX_DMA // Uses GPIO3/RXD0/RX, more info: https://github.com/Makuna/NeoPixelBus/wiki/ESP8266-NeoMethods
-  #ifndef LED_TYPE_WS2811 
+  #ifndef LED_TYPE_WS2811
     NeoEsp8266Dma800KbpsMethod* dma; //800 KHz bitstream (most NeoPixel products w/WS2812 LEDs)
   #else
     NeoEsp8266Dma400KbpsMethod* dma;  //400 KHz (classic 'v1' (not v2) FLORA pixels, WS2811 drivers)
@@ -182,7 +195,7 @@ void tick()
     DBG_OUTPUT_PORT.printf("readEEPROM(): %s\n", res.c_str());
     return res;
   }
-  
+
   void writeEEPROM(int offset, int len, String value) {
     DBG_OUTPUT_PORT.printf("writeEEPROM(): %s\n", value.c_str());
     for (int i = 0; i < len; ++i)
@@ -281,7 +294,7 @@ void initStrip(uint16_t stripSize = WS2812FXStripSettings.stripSize, neoPixelTyp
   // pixel power leads, add 300 - 500 Ohm resistor on first pixel's data input
   // and minimize distance between Arduino and first pixel.  Avoid connecting
   // on a live circuit...if you must, connect GND first.
-  
+
   strip->init();
   #if defined(USE_WS2812FX_DMA) or defined(USE_WS2812FX_UART1) or defined(USE_WS2812FX_UART2)
     initDMA(stripSize);
@@ -319,8 +332,12 @@ void setup() {
   // set builtin led pin as output
   pinMode(BUILTIN_LED, OUTPUT);
   // button pin setup
-#ifdef ENABLE_BUTTON
-  pinMode(BUTTON,INPUT_PULLUP);
+#ifdef ENABLE_BUTTONS
+  debouncer1.attach(BUTTON_1, INPUT_PULLUP);
+  debouncer1.interval(25);
+
+  debouncer2.attach(BUTTON_2, INPUT_PULLUP);
+  debouncer2.interval(25);
 #endif
   // start ticker with 0.5 because we start in AP mode and try to connect
   ticker.attach(0.5, tick);
@@ -356,26 +373,43 @@ void setup() {
   // The extra parameters to be configured (can be either global or just in the setup)
   // After connecting, parameter.getValue() will get you the configured value
   // id/name placeholder/prompt default length
-  #if defined(ENABLE_MQTT) or defined(ENABLE_AMQTT)
-    #if defined(ENABLE_STATE_SAVE_SPIFFS) and (defined(ENABLE_MQTT) or defined(ENABLE_AMQTT))
+  #if defined(ENABLE_MQTT) or defined(ENABLE_AMQTT) or defined(ENABLE_BUTTONS)
+    #if defined(ENABLE_STATE_SAVE_SPIFFS)
       (readConfigFS()) ? DBG_OUTPUT_PORT.println("WiFiManager config FS Read success!"): DBG_OUTPUT_PORT.println("WiFiManager config FS Read failure!");
     #else
-      String settings_available = readEEPROM(134, 1);
+      String settings_available = readEEPROM(204, 1);
       if (settings_available == "1") {
-        readEEPROM(0, 64).toCharArray(mqtt_host, 64);   // 0-63
-        readEEPROM(64, 6).toCharArray(mqtt_port, 6);    // 64-69
-        readEEPROM(70, 32).toCharArray(mqtt_user, 32);  // 70-101
-        readEEPROM(102, 32).toCharArray(mqtt_pass, 32); // 102-133
-        DBG_OUTPUT_PORT.printf("MQTT host: %s\n", mqtt_host);
-        DBG_OUTPUT_PORT.printf("MQTT port: %s\n", mqtt_port);
-        DBG_OUTPUT_PORT.printf("MQTT user: %s\n", mqtt_user);
-        DBG_OUTPUT_PORT.printf("MQTT pass: %s\n", mqtt_pass);
+        #if defined(ENABLE_MQTT) or defined(ENABLE_AMQTT)
+          readEEPROM(0, 64).toCharArray(mqtt_host, 64);   // 0-63
+          readEEPROM(64, 6).toCharArray(mqtt_port, 6);    // 64-69
+          readEEPROM(70, 32).toCharArray(mqtt_user, 32);  // 70-101
+          readEEPROM(102, 32).toCharArray(mqtt_pass, 32); // 102-133
+          DBG_OUTPUT_PORT.printf("MQTT host: %s\n", mqtt_host);
+          DBG_OUTPUT_PORT.printf("MQTT port: %s\n", mqtt_port);
+          DBG_OUTPUT_PORT.printf("MQTT user: %s\n", mqtt_user);
+          DBG_OUTPUT_PORT.printf("MQTT pass: %s\n", mqtt_pass);
+        #endif
+
+        #if defined(ENABLE_BUTTONS)
+          readEEPROM(134, 64).toCharArray(udp_host, 64);  // 134-197
+          readEEPROM(198, 6).toCharArray(udp_port, 6); // 198-203
+          DBG_OUTPUT_PORT.printf("UDP host: %s\n", udp_host);
+          DBG_OUTPUT_PORT.printf("UDP port: %s\n", udp_port);
+        #endif
       }
     #endif
+  #endif
+
+  #if defined(ENABLE_MQTT) or defined(ENABLE_AMQTT)
     WiFiManagerParameter custom_mqtt_host("host", "MQTT hostname", mqtt_host, 64);
     WiFiManagerParameter custom_mqtt_port("port", "MQTT port", mqtt_port, 6);
     WiFiManagerParameter custom_mqtt_user("user", "MQTT user", mqtt_user, 32, " maxlength=31");
     WiFiManagerParameter custom_mqtt_pass("pass", "MQTT pass", mqtt_pass, 32, " maxlength=31 type='password'");
+  #endif
+
+  #ifdef ENABLE_BUTTONS
+    WiFiManagerParameter custom_udp_host("udp_target_ip", "UDP Receiver", udp_host, 64);
+    WiFiManagerParameter custom_udp_port("udp_target_port", "UDP Port", udp_port, 5);
   #endif
 
   sprintf(strip_size, "%d", WS2812FXStripSettings.stripSize);
@@ -403,19 +437,24 @@ void setup() {
     wifiManager.addParameter(&custom_mqtt_pass);
   #endif
 
+  #ifdef ENABLE_BUTTONS
+    wifiManager.addParameter(&custom_udp_host);
+    wifiManager.addParameter(&custom_udp_port);
+  #endif
+
   wifiManager.addParameter(&custom_strip_size);
   wifiManager.addParameter(&custom_led_pin);
 
   WiFi.setSleepMode(WIFI_NONE_SLEEP);
-  
+
   // Uncomment if you want to restart ESP8266 if it cannot connect to WiFi.
   // Value in brackets is in seconds that WiFiManger waits until restart
   #ifdef WIFIMGR_PORTAL_TIMEOUT
   wifiManager.setConfigPortalTimeout(WIFIMGR_PORTAL_TIMEOUT);
   #endif
 
-  // Uncomment if you want to set static IP 
-  // Order is: IP, Gateway and Subnet 
+  // Uncomment if you want to set static IP
+  // Order is: IP, Gateway and Subnet
   #ifdef WIFIMGR_SET_MANUAL_IP
   wifiManager.setSTAStaticIPConfig(IPAddress(_ip[0], _ip[1], _ip[2], _ip[3]), IPAddress(_gw[0], _gw[1], _gw[2], _gw[3]), IPAddress(_sn[0], _sn[1], _sn[2], _sn[3]));
   #endif
@@ -431,30 +470,50 @@ void setup() {
     delay(1000);  //Will be removed when upgrading to standalone offline McLightingUI version
   }
 
-  #if defined(ENABLE_MQTT) or defined(ENABLE_AMQTT)
-    //read updated parameters
-    strcpy(mqtt_host, custom_mqtt_host.getValue());
-    strcpy(mqtt_port, custom_mqtt_port.getValue());
-    strcpy(mqtt_user, custom_mqtt_user.getValue());
-    strcpy(mqtt_pass, custom_mqtt_pass.getValue());
+  #if defined(ENABLE_MQTT) or defined(ENABLE_AMQTT) or defined(ENABLE_BUTTONS)
+
+    #if defined(ENABLE_MQTT) or defined(ENABLE_AMQTT)
+      strcpy(mqtt_host, custom_mqtt_host.getValue());
+      strcpy(mqtt_port, custom_mqtt_port.getValue());
+      strcpy(mqtt_user, custom_mqtt_user.getValue());
+      strcpy(mqtt_pass, custom_mqtt_pass.getValue());
+    #endif
+
+    #ifdef ENABLE_BUTTONS
+      strcpy(udp_host, custom_udp_host.getValue());
+      strcpy(udp_port, custom_udp_port.getValue());
+
+      DBG_OUTPUT_PORT.print("UDP event target (buttons) = ");
+      DBG_OUTPUT_PORT.print(udp_host);
+      DBG_OUTPUT_PORT.print(":");
+      DBG_OUTPUT_PORT.println(udp_port);
+    #endif
 
     //save the custom parameters to FS
-    #if defined(ENABLE_STATE_SAVE_SPIFFS) and (defined(ENABLE_MQTT) or defined(ENABLE_AMQTT))
+    #if defined(ENABLE_STATE_SAVE_SPIFFS)
       (writeConfigFS(shouldSaveConfig)) ? DBG_OUTPUT_PORT.println("WiFiManager config FS Save success!"): DBG_OUTPUT_PORT.println("WiFiManager config FS Save failure!");
     #else if defined(ENABLE_STATE_SAVE_EEPROM)
       if (shouldSaveConfig) {
         DBG_OUTPUT_PORT.println("Saving WiFiManager config");
 
-        writeEEPROM(0, 64, mqtt_host);   // 0-63
-        writeEEPROM(64, 6, mqtt_port);   // 64-69
-        writeEEPROM(70, 32, mqtt_user);  // 70-101
-        writeEEPROM(102, 32, mqtt_pass); // 102-133
-        writeEEPROM(134, 1, "1");        // 134 --> always "1"
+        #if defined(ENABLE_MQTT) or defined(ENABLE_AMQTT)
+          writeEEPROM(0, 64, mqtt_host);   // 0-63
+          writeEEPROM(64, 6, mqtt_port);   // 64-69
+          writeEEPROM(70, 32, mqtt_user);  // 70-101
+          writeEEPROM(102, 32, mqtt_pass); // 102-133
+        #endif
+
+        #if defined(ENABLE_BUTTONS)
+          writeEEPROM(134, 64, udp_host); // 134-197
+          writeEEPROM(198, 6, udp_port); // 198-203
+        #endif
+
+        writeEEPROM(204, 1, "1");        // 204 --> always "1"
         EEPROM.commit();
       }
     #endif
   #endif
-  
+
   #ifdef ENABLE_AMQTT
     wifiConnectHandler = WiFi.onStationModeGotIP(onWifiConnect);
     wifiDisconnectHandler = WiFi.onStationModeDisconnected(onWifiDisconnect);
@@ -598,7 +657,7 @@ void setup() {
   server.on("/esp_status", HTTP_GET, []() {
     DynamicJsonDocument jsonBuffer(JSON_OBJECT_SIZE(21) + 1500);
     JsonObject json = jsonBuffer.to<JsonObject>();
-  
+
     json["HOSTNAME"] = HOSTNAME;
     json["version"] = SKETCH_VERSION;
     json["heap"] = ESP.getFreeHeap();
@@ -625,7 +684,7 @@ void setup() {
       json["pin"] = LED_PIN;
     #endif
     json["number_leds"] = NUMLEDS;
-    #ifdef ENABLE_BUTTON
+    #ifdef ENABLE_BUTTONS
       json["button_mode"] = "ON";
     #else
       json["button_mode"] = "OFF";
@@ -658,7 +717,7 @@ void setup() {
     #ifdef ENABLE_STATE_SAVE_EEPROM
       json["state_save"] = "EEPROM";
     #endif
-    
+
     String json_str;
     serializeJson(json, json_str);
     server.sendHeader("Access-Control-Allow-Origin", "*");
@@ -882,7 +941,7 @@ void setup() {
       strip->setMode(ws2812fx_mode);
       strip->trigger();
     }
-    
+
     DynamicJsonDocument jsonBuffer(200);
     JsonObject json = jsonBuffer.to<JsonObject>();
     json["pixel_count"] = WS2812FXStripSettings.stripSize;
@@ -957,7 +1016,7 @@ void setup() {
         if(!spiffs_save_state.active()) spiffs_save_state.once(3, tickerSpiffsSaveState);
       #endif
     });
-  
+
     server.on("/rainbow", []() {
       exit_func = true;
       mode = RAINBOW;
@@ -976,7 +1035,7 @@ void setup() {
         if(!spiffs_save_state.active()) spiffs_save_state.once(3, tickerSpiffsSaveState);
       #endif
     });
-  
+
     server.on("/rainbowCycle", []() {
       exit_func = true;
       mode = RAINBOWCYCLE;
@@ -995,7 +1054,7 @@ void setup() {
         if(!spiffs_save_state.active()) spiffs_save_state.once(3, tickerSpiffsSaveState);
       #endif
     });
-  
+
     server.on("/theaterchase", []() {
       exit_func = true;
       mode = THEATERCHASE;
@@ -1014,7 +1073,7 @@ void setup() {
         if(!spiffs_save_state.active()) spiffs_save_state.once(3, tickerSpiffsSaveState);
       #endif
     });
-  
+
     server.on("/twinkleRandom", []() {
       exit_func = true;
       mode = TWINKLERANDOM;
@@ -1033,7 +1092,7 @@ void setup() {
         if(!spiffs_save_state.active()) spiffs_save_state.once(3, tickerSpiffsSaveState);
       #endif
     });
-    
+
     server.on("/theaterchaseRainbow", []() {
       exit_func = true;
       mode = THEATERCHASERAINBOW;
@@ -1073,7 +1132,7 @@ void setup() {
       #endif
     });
     #endif
-  
+
     server.on("/tv", []() {
       exit_func = true;
       mode = TV;
@@ -1152,10 +1211,16 @@ void setup() {
   #endif
 }
 
-
 void loop() {
-  #ifdef ENABLE_BUTTON
-    button();
+  #ifdef ENABLE_BUTTONS
+    debouncer1.update();
+    if (debouncer1.fell()) {
+      button1();
+    }
+    debouncer2.update();
+    if (debouncer2.fell()) {
+      button2();
+    }
   #endif
   server.handleClient();
   webSocket.loop();
@@ -1192,7 +1257,7 @@ void loop() {
 //   if(!ha_send_data.active())  ha_send_data.once(5, tickerSendState);
    if (new_ha_mqtt_msg) sendState();
   #endif
-          
+
   // Simple statemachine that handles the different modes
   if (mode == SET_MODE) {
     DBG_OUTPUT_PORT.printf("SET_MODE: %d %d\n", ws2812fx_mode, mode);
