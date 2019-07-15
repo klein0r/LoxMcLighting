@@ -1,24 +1,27 @@
+# 1 "/var/folders/nx/6sk5l7c120nftbm1k3sz87z00000gn/T/tmpqrm4lX"
+#include <Arduino.h>
+# 1 "/Users/matthiaskleine/Dev/PlatformIO/McLighting/Arduino/McLighting/McLighting.ino"
 #include "definitions.h"
 #include "version.h"
-// ***************************************************************************
-// Load libraries for: WebServer / WiFiManager / WebSockets
-// ***************************************************************************
-#include <ESP8266WiFi.h>          //https://github.com/esp8266/Arduino
 
-// needed for library WiFiManager
+
+
+#include <ESP8266WiFi.h>
+
+
 #include <DNSServer.h>
 #include <ESP8266WebServer.h>
-#include <WiFiManager.h>        //https://github.com/tzapu/WiFiManager
+#include <WiFiManager.h>
 
 #include <WiFiClient.h>
 #include <ESP8266mDNS.h>
 #include <FS.h>
 #include <EEPROM.h>
 
-#include <WebSockets.h>           //https://github.com/Links2004/arduinoWebSockets
+#include <WebSockets.h>
 #include <WebSocketsServer.h>
 
-// OTA
+
 #if defined(ENABLE_OTA) or defined(ENABLE_BUTTONS)
   #include <WiFiUdp.h>
 #endif
@@ -31,16 +34,16 @@
   #include <Bounce2.h>
 #endif
 
-//SPIFFS Save
+
 #if !defined(ENABLE_HOMEASSISTANT) and defined(ENABLE_STATE_SAVE_SPIFFS)
-  #include <ArduinoJson.h>        //https://github.com/bblanchon/ArduinoJson
+  #include <ArduinoJson.h>
 #endif
 
-// MQTT
+
 #ifdef ENABLE_MQTT
   #include <PubSubClient.h>
   #ifdef ENABLE_HOMEASSISTANT
-    #include <ArduinoJson.h>     //https://github.com/bblanchon/ArduinoJson
+    #include <ArduinoJson.h>
   #endif
 
   WiFiClient espClient;
@@ -48,8 +51,8 @@
 #endif
 
 #ifdef ENABLE_AMQTT
-  #include <AsyncMqttClient.h>    //https://github.com/marvinroger/async-mqtt-client
-                                  //https://github.com/me-no-dev/ESPAsyncTCP
+  #include <AsyncMqttClient.h>
+
   #ifdef ENABLE_HOMEASSISTANT
     #include <ArduinoJson.h>
   #endif
@@ -66,8 +69,8 @@
 #endif
 
 #ifdef ENABLE_E131
-  #include <ESPAsyncUDP.h>         //https://github.com/me-no-dev/ESPAsyncUDP
-  #include <ESPAsyncE131.h>        //https://github.com/forkineye/ESPAsyncE131
+  #include <ESPAsyncUDP.h>
+  #include <ESPAsyncE131.h>
   ESPAsyncE131 e131(END_UNIVERSE - START_UNIVERSE + 1);
 #endif
 
@@ -81,9 +84,9 @@
   Bounce debouncer2 = Bounce();
 #endif
 
-// ***************************************************************************
-// Instanciate HTTP(80) / WebSockets(81) Server
-// ***************************************************************************
+
+
+
 ESP8266WebServer server(80);
 WebSocketsServer webSocket = WebSocketsServer(81);
 
@@ -92,10 +95,10 @@ WebSocketsServer webSocket = WebSocketsServer(81);
 ESP8266HTTPUpdateServer httpUpdater;
 #endif
 
-// ***************************************************************************
-// Load libraries / Instanciate WS2812FX library
-// ***************************************************************************
-// https://github.com/kitesurfer1404/WS2812FX
+
+
+
+
 #include <WS2812FX.h>
 
 WS2812FX* strip;
@@ -103,54 +106,61 @@ WS2812FX* strip;
 #if defined(USE_WS2812FX_DMA) or defined(USE_WS2812FX_UART1) or defined(USE_WS2812FX_UART2)
 #include <NeoPixelBus.h>
 
-#ifdef USE_WS2812FX_DMA // Uses GPIO3/RXD0/RX, more info: https://github.com/Makuna/NeoPixelBus/wiki/ESP8266-NeoMethods
+#ifdef USE_WS2812FX_DMA
   #ifndef LED_TYPE_WS2811
-    NeoEsp8266Dma800KbpsMethod* dma; //800 KHz bitstream (most NeoPixel products w/WS2812 LEDs)
+    NeoEsp8266Dma800KbpsMethod* dma;
   #else
-    NeoEsp8266Dma400KbpsMethod* dma;  //400 KHz (classic 'v1' (not v2) FLORA pixels, WS2811 drivers)
+    NeoEsp8266Dma400KbpsMethod* dma;
   #endif
 #endif
-#ifdef USE_WS2812FX_UART1 // Uses UART1: GPIO1/TXD0/TX, more info: https://github.com/Makuna/NeoPixelBus/wiki/ESP8266-NeoMethods
+#ifdef USE_WS2812FX_UART1
   #ifndef LED_TYPE_WS2811
-    NeoEsp8266Uart1800KbpsMethod* dma; //800 KHz bitstream (most NeoPixel products w/WS2812 LEDs)
+    NeoEsp8266Uart1800KbpsMethod* dma;
   #else
-    NeoEsp8266Uart1400KbpsMethod* dma; //400 KHz (classic 'v1' (not v2) FLORA pixels, WS2811 drivers)
+    NeoEsp8266Uart1400KbpsMethod* dma;
   #endif
 #endif
-#ifdef USE_WS2812FX_UART2 // Uses UART2: GPIO2/TXD1/D4, more info: https://github.com/Makuna/NeoPixelBus/wiki/ESP8266-NeoMethods
+#ifdef USE_WS2812FX_UART2
   #ifndef LED_TYPE_WS2811
-    NeoEsp8266Uart0800KbpsMethod* dma; //800 KHz bitstream (most NeoPixel products w/WS2812 LEDs)
+    NeoEsp8266Uart0800KbpsMethod* dma;
   #else
-    NeoEsp8266Uart0400KbpsMethod* dma; //400 KHz (classic 'v1' (not v2) FLORA pixels, WS2811 drivers)
+    NeoEsp8266Uart0400KbpsMethod* dma;
   #endif
 #endif
 
 void initDMA(uint16_t stripSize = NUMLEDS){
   if (dma) delete dma;
-#ifdef USE_WS2812FX_DMA // Uses GPIO3/RXD0/RX, more info: https://github.com/Makuna/NeoPixelBus/wiki/ESP8266-NeoMethods
+#ifdef USE_WS2812FX_DMA
   #ifndef LED_TYPE_WS2811
-    dma = new NeoEsp8266Dma800KbpsMethod(stripSize, 3);  //800 KHz bitstream (most NeoPixel products w/WS2812 LEDs)
+    dma = new NeoEsp8266Dma800KbpsMethod(stripSize, 3);
   #else
-    dma = new NeoEsp8266Dma400KbpsMethod(stripSize, 3);  //400 KHz (classic 'v1' (not v2) FLORA pixels, WS2811 drivers)
+    dma = new NeoEsp8266Dma400KbpsMethod(stripSize, 3);
   #endif
 #endif
-#ifdef USE_WS2812FX_UART1 // Uses UART1: GPIO1/TXD0/TX, more info: https://github.com/Makuna/NeoPixelBus/wiki/ESP8266-NeoMethods
+#ifdef USE_WS2812FX_UART1
   #ifndef LED_TYPE_WS2811
-    dma = new NeoEsp8266Uart1800KbpsMethod(stripSize, 3); //800 KHz bitstream (most NeoPixel products w/WS2812 LEDs)
+    dma = new NeoEsp8266Uart1800KbpsMethod(stripSize, 3);
   #else
-    dma = new NeoEsp8266Uart1400KbpsMethod(stripSize, 3); //400 KHz (classic 'v1' (not v2) FLORA pixels, WS2811 drivers)
+    dma = new NeoEsp8266Uart1400KbpsMethod(stripSize, 3);
   #endif
 #endif
-#ifdef USE_WS2812FX_UART2 // Uses UART2: GPIO2/TXD1/D4, more info: https://github.com/Makuna/NeoPixelBus/wiki/ESP8266-NeoMethods
+#ifdef USE_WS2812FX_UART2
   #ifndef LED_TYPE_WS2811
-    dma = new NeoEsp8266Uart0800KbpsMethod(stripSize, 3); //800 KHz bitstream (most NeoPixel products w/WS2812 LEDs)
+    dma = new NeoEsp8266Uart0800KbpsMethod(stripSize, 3);
   #else
-    dma = new NeoEsp8266Uart0400KbpsMethod(stripSize, 3); //400 KHz (classic 'v1' (not v2) FLORA pixels, WS2811 drivers)
+    dma = new NeoEsp8266Uart0400KbpsMethod(stripSize, 3);
   #endif
 #endif
   dma->Initialize();
 }
-
+void DMA_Show(void);
+void tick();
+String getValue(String data, char separator, int index);
+void configModeCallback (WiFiManager *myWiFiManager);
+void saveConfigCallback ();
+void setup();
+void loop();
+#line 154 "/Users/matthiaskleine/Dev/PlatformIO/McLighting/Arduino/McLighting/McLighting.ino"
 void DMA_Show(void) {
   if(dma->IsReadyToUpdate()) {
     memcpy(dma->getPixels(), strip->getPixels(), dma->getPixelsSize());
@@ -159,9 +169,9 @@ void DMA_Show(void) {
 }
 #endif
 
-// ***************************************************************************
-// Load library "ticker" for blinking status led
-// ***************************************************************************
+
+
+
 #include <Ticker.h>
 Ticker ticker;
 #ifdef ENABLE_HOMEASSISTANT
@@ -176,21 +186,21 @@ Ticker ticker;
 #endif
 void tick()
 {
-  //toggle state
-  int state = digitalRead(BUILTIN_LED);  // get the current state of GPIO1 pin
-  digitalWrite(BUILTIN_LED, !state);     // set pin to the opposite state
+
+  int state = digitalRead(BUILTIN_LED);
+  digitalWrite(BUILTIN_LED, !state);
 }
 
 #ifdef ENABLE_STATE_SAVE_EEPROM
-  // ***************************************************************************
-  // EEPROM helper
-  // ***************************************************************************
+
+
+
   String readEEPROM(int offset, int len) {
     String res = "";
     for (int i = 0; i < len; ++i)
     {
       res += char(EEPROM.read(i + offset));
-      //DBG_OUTPUT_PORT.println(char(EEPROM.read(i + offset)));
+
     }
     DBG_OUTPUT_PORT.printf("readEEPROM(): %s\n", res.c_str());
     return res;
@@ -209,10 +219,10 @@ void tick()
   }
 #endif
 
-// ***************************************************************************
-// Saved state handling
-// ***************************************************************************
-// https://stackoverflow.com/questions/9072320/split-string-into-string-array
+
+
+
+
 String getValue(String data, char separator, int index)
 {
   int found = 0;
@@ -230,16 +240,16 @@ String getValue(String data, char separator, int index)
   return found>index ? data.substring(strIndex[0], strIndex[1]) : "";
 }
 
-// ***************************************************************************
-// Callback for WiFiManager library when config mode is entered
-// ***************************************************************************
-//gets called when WiFiManager enters configuration mode
+
+
+
+
 void configModeCallback (WiFiManager *myWiFiManager) {
   DBG_OUTPUT_PORT.println("Entered config mode");
   DBG_OUTPUT_PORT.println(WiFi.softAPIP());
-  //if you used auto generated SSID, print it
+
   DBG_OUTPUT_PORT.println(myWiFiManager->getConfigPortalSSID());
-  //entered config mode, make led toggle faster
+
   ticker.attach(0.2, tick);
 
   uint16_t i;
@@ -249,27 +259,27 @@ void configModeCallback (WiFiManager *myWiFiManager) {
   strip->show();
 }
 
-//callback notifying us of the need to save config
+
 void saveConfigCallback () {
   DBG_OUTPUT_PORT.println("Should save config");
   shouldSaveConfig = true;
 }
 
-// ***************************************************************************
-// Include: Webserver
-// ***************************************************************************
+
+
+
 #include "spiffs_webserver.h"
 
-// ***************************************************************************
-// Include: Request handlers
-// ***************************************************************************
+
+
+
 #include "request_handlers.h"
 
 #ifdef CUSTOM_WS2812FX_ANIMATIONS
-  #include "custom_ws2812fx_animations.h" // Add animations in this file
+  #include "custom_ws2812fx_animations.h"
 #endif
 
-// function to Initialize the strip
+
 void initStrip(uint16_t stripSize = WS2812FXStripSettings.stripSize, neoPixelType RGBOrder = WS2812FXStripSettings.RGBOrder, uint8_t pin = WS2812FXStripSettings.pin){
   if (strip) {
     delete strip;
@@ -282,19 +292,7 @@ void initStrip(uint16_t stripSize = WS2812FXStripSettings.stripSize, neoPixelTyp
   #else
     strip = new WS2812FX(stripSize, pin, RGBOrder + NEO_KHZ400);
   #endif
-  // Parameter 1 = number of pixels in strip
-  // Parameter 2 = Arduino pin number (most are valid)
-  // Parameter 3 = pixel type flags, add together as needed:
-  //   NEO_KHZ800  800 KHz bitstream (most NeoPixel products w/WS2812 LEDs)
-  //   NEO_KHZ400  400 KHz (classic 'v1' (not v2) FLORA pixels, WS2811 drivers)
-  //   NEO_GRB     Pixels are wired for GRB bitstream (most NeoPixel products)
-  //   NEO_RGB     Pixels are wired for RGB bitstream (v1 FLORA pixels, not v2)
-
-  // IMPORTANT: To reduce NeoPixel burnout risk, add 1000 uF capacitor across
-  // pixel power leads, add 300 - 500 Ohm resistor on first pixel's data input
-  // and minimize distance between Arduino and first pixel.  Avoid connecting
-  // on a live circuit...if you must, connect GND first.
-
+# 298 "/Users/matthiaskleine/Dev/PlatformIO/McLighting/Arduino/McLighting/McLighting.ino"
   strip->init();
   #if defined(USE_WS2812FX_DMA) or defined(USE_WS2812FX_UART1) or defined(USE_WS2812FX_UART2)
     initDMA(stripSize);
@@ -302,9 +300,9 @@ void initStrip(uint16_t stripSize = WS2812FXStripSettings.stripSize, neoPixelTyp
   #endif
   strip->setBrightness(brightness);
   strip->setSpeed(convertSpeed(ws2812fx_speed));
-  //strip->setMode(ws2812fx_mode);
+
   strip->setColor(main_color.red, main_color.green, main_color.blue);
-  strip->setOptions(0, GAMMA);  // We only have one WS2812FX segment, set color to human readable GAMMA correction
+  strip->setOptions(0, GAMMA);
 #ifdef CUSTOM_WS2812FX_ANIMATIONS
   strip->setCustomMode(0, F("Fire 2012"), myCustomEffect);
 #endif
@@ -313,25 +311,25 @@ void initStrip(uint16_t stripSize = WS2812FXStripSettings.stripSize, neoPixelTyp
   saveWS2812FXStripSettings.once(3, writeStripConfigFS);
 }
 
-// ***************************************************************************
-// Include: Color modes
-// ***************************************************************************
+
+
+
 #ifdef ENABLE_LEGACY_ANIMATIONS
   #include "colormodes.h"
 #endif
 
-// ***************************************************************************
-// MAIN
-// ***************************************************************************
+
+
+
 void setup() {
-//  system_update_cpu_freq(160);
+
 
   DBG_OUTPUT_PORT.begin(115200);
   EEPROM.begin(512);
 
-  // set builtin led pin as output
+
   pinMode(BUILTIN_LED, OUTPUT);
-  // button pin setup
+
 #ifdef ENABLE_BUTTONS
   debouncer1.attach(BUTTON_1, INPUT_PULLUP);
   debouncer1.interval(25);
@@ -339,12 +337,12 @@ void setup() {
   debouncer2.attach(BUTTON_2, INPUT_PULLUP);
   debouncer2.interval(25);
 #endif
-  // start ticker with 0.5 because we start in AP mode and try to connect
+
   ticker.attach(0.5, tick);
 
-  // ***************************************************************************
-  // Setup: SPIFFS
-  // ***************************************************************************
+
+
+
   SPIFFS.begin();
   {
     Dir dir = SPIFFS.openDir("/");
@@ -361,18 +359,18 @@ void setup() {
 
   wifi_station_set_hostname(const_cast<char*>(HOSTNAME));
 
-  // ***************************************************************************
-  // Setup: Neopixel
-  // ***************************************************************************
-  readStripConfigFS(); // Read config from FS first
+
+
+
+  readStripConfigFS();
   initStrip();
 
-  // ***************************************************************************
-  // Setup: WiFiManager
-  // ***************************************************************************
-  // The extra parameters to be configured (can be either global or just in the setup)
-  // After connecting, parameter.getValue() will get you the configured value
-  // id/name placeholder/prompt default length
+
+
+
+
+
+
   #if defined(ENABLE_MQTT) or defined(ENABLE_AMQTT) or defined(ENABLE_BUTTONS)
     #if defined(ENABLE_STATE_SAVE_SPIFFS)
       (readConfigFS()) ? DBG_OUTPUT_PORT.println("WiFiManager config FS Read success!"): DBG_OUTPUT_PORT.println("WiFiManager config FS Read failure!");
@@ -380,10 +378,10 @@ void setup() {
       String settings_available = readEEPROM(204, 1);
       if (settings_available == "1") {
         #if defined(ENABLE_MQTT) or defined(ENABLE_AMQTT)
-          readEEPROM(0, 64).toCharArray(mqtt_host, 64);   // 0-63
-          readEEPROM(64, 6).toCharArray(mqtt_port, 6);    // 64-69
-          readEEPROM(70, 32).toCharArray(mqtt_user, 32);  // 70-101
-          readEEPROM(102, 32).toCharArray(mqtt_pass, 32); // 102-133
+          readEEPROM(0, 64).toCharArray(mqtt_host, 64);
+          readEEPROM(64, 6).toCharArray(mqtt_port, 6);
+          readEEPROM(70, 32).toCharArray(mqtt_user, 32);
+          readEEPROM(102, 32).toCharArray(mqtt_pass, 32);
           DBG_OUTPUT_PORT.printf("MQTT host: %s\n", mqtt_host);
           DBG_OUTPUT_PORT.printf("MQTT port: %s\n", mqtt_port);
           DBG_OUTPUT_PORT.printf("MQTT user: %s\n", mqtt_user);
@@ -391,8 +389,8 @@ void setup() {
         #endif
 
         #if defined(ENABLE_BUTTONS)
-          readEEPROM(134, 64).toCharArray(udp_host, 64);  // 134-197
-          readEEPROM(198, 6).toCharArray(udp_port, 6); // 198-203
+          readEEPROM(134, 64).toCharArray(udp_host, 64);
+          readEEPROM(198, 6).toCharArray(udp_port, 6);
           DBG_OUTPUT_PORT.printf("UDP host: %s\n", udp_host);
           DBG_OUTPUT_PORT.printf("UDP port: %s\n", udp_port);
         #endif
@@ -412,19 +410,19 @@ void setup() {
     WiFiManagerParameter custom_udp_port("udp_target_port", "UDP Port", udp_port, 5);
   #endif
 
-  //Local intialization. Once its business is done, there is no need to keep it around
-  WiFiManager wifiManager;
-  //reset settings - for testing
-  //wifiManager.resetSettings();
 
-  //set callback that gets called when connecting to previous WiFi fails, and enters Access Point mode
+  WiFiManager wifiManager;
+
+
+
+
   wifiManager.setAPCallback(configModeCallback);
 
-  //set config save notify callback
+
   wifiManager.setSaveConfigCallback(saveConfigCallback);
 
   #if defined(ENABLE_MQTT) or defined(ENABLE_AMQTT)
-    //add all your parameters here
+
     wifiManager.addParameter(&custom_mqtt_host);
     wifiManager.addParameter(&custom_mqtt_port);
     wifiManager.addParameter(&custom_mqtt_user);
@@ -438,27 +436,27 @@ void setup() {
 
   WiFi.setSleepMode(WIFI_NONE_SLEEP);
 
-  // Uncomment if you want to restart ESP8266 if it cannot connect to WiFi.
-  // Value in brackets is in seconds that WiFiManger waits until restart
+
+
   #ifdef WIFIMGR_PORTAL_TIMEOUT
   wifiManager.setConfigPortalTimeout(WIFIMGR_PORTAL_TIMEOUT);
   #endif
 
-  // Uncomment if you want to set static IP
-  // Order is: IP, Gateway and Subnet
+
+
   #ifdef WIFIMGR_SET_MANUAL_IP
   wifiManager.setSTAStaticIPConfig(IPAddress(_ip[0], _ip[1], _ip[2], _ip[3]), IPAddress(_gw[0], _gw[1], _gw[2], _gw[3]), IPAddress(_sn[0], _sn[1], _sn[2], _sn[3]));
   #endif
 
-  //fetches ssid and pass and tries to connect
-  //if it does not connect it starts an access point with the specified name
-  //here  "AutoConnectAP"
-  //and goes into a blocking loop awaiting configuration
+
+
+
+
   if (!wifiManager.autoConnect(HOSTNAME)) {
     DBG_OUTPUT_PORT.println("failed to connect and hit timeout");
-    //reset and try again, or maybe put it to deep sleep
-    ESP.reset();  //Will be removed when upgrading to standalone offline McLightingUI version
-    delay(1000);  //Will be removed when upgrading to standalone offline McLightingUI version
+
+    ESP.reset();
+    delay(1000);
   }
 
   #if defined(ENABLE_MQTT) or defined(ENABLE_AMQTT) or defined(ENABLE_BUTTONS)
@@ -480,7 +478,7 @@ void setup() {
       DBG_OUTPUT_PORT.println(udp_port);
     #endif
 
-    //save the custom parameters to FS
+
     #if defined(ENABLE_STATE_SAVE_SPIFFS)
       (writeConfigFS(shouldSaveConfig)) ? DBG_OUTPUT_PORT.println("WiFiManager config FS Save success!"): DBG_OUTPUT_PORT.println("WiFiManager config FS Save failure!");
     #else if defined(ENABLE_STATE_SAVE_EEPROM)
@@ -488,18 +486,18 @@ void setup() {
         DBG_OUTPUT_PORT.println("Saving WiFiManager config");
 
         #if defined(ENABLE_MQTT) or defined(ENABLE_AMQTT)
-          writeEEPROM(0, 64, mqtt_host);   // 0-63
-          writeEEPROM(64, 6, mqtt_port);   // 64-69
-          writeEEPROM(70, 32, mqtt_user);  // 70-101
-          writeEEPROM(102, 32, mqtt_pass); // 102-133
+          writeEEPROM(0, 64, mqtt_host);
+          writeEEPROM(64, 6, mqtt_port);
+          writeEEPROM(70, 32, mqtt_user);
+          writeEEPROM(102, 32, mqtt_pass);
         #endif
 
         #if defined(ENABLE_BUTTONS)
-          writeEEPROM(134, 64, udp_host); // 134-197
-          writeEEPROM(198, 6, udp_port); // 198-203
+          writeEEPROM(134, 64, udp_host);
+          writeEEPROM(198, 6, udp_port);
         #endif
 
-        writeEEPROM(204, 1, "1");        // 204 --> always "1"
+        writeEEPROM(204, 1, "1");
         EEPROM.commit();
       }
     #endif
@@ -512,32 +510,25 @@ void setup() {
 
   initStrip();
 
-  //if you get here you have connected to the WiFi
+
   DBG_OUTPUT_PORT.println("connected...yeey :)");
   ticker.detach();
-  //keep LED on
+
   digitalWrite(BUILTIN_LED, LOW);
 
 
-  // ***************************************************************************
-  // Configure OTA
-  // ***************************************************************************
+
+
+
   #ifdef ENABLE_OTA
     DBG_OUTPUT_PORT.println("Arduino OTA activated.");
 
-    // Port defaults to 8266
+
     ArduinoOTA.setPort(8266);
 
-    // Hostname defaults to esp8266-[ChipID]
+
     ArduinoOTA.setHostname(HOSTNAME);
-
-    // No authentication by default
-    // ArduinoOTA.setPassword("admin");
-
-    // Password can be set with it's md5 value as well
-    // MD5(admin) = 21232f297a57a5a743894a0e4a801fc3
-    // ArduinoOTA.setPasswordHash("21232f297a57a5a743894a0e4a801fc3");
-
+# 541 "/Users/matthiaskleine/Dev/PlatformIO/McLighting/Arduino/McLighting/McLighting.ino"
     ArduinoOTA.onStart([]() {
       DBG_OUTPUT_PORT.println("Arduino OTA: Start updating");
     });
@@ -561,9 +552,9 @@ void setup() {
   #endif
 
 
-  // ***************************************************************************
-  // Configure MQTT
-  // ***************************************************************************
+
+
+
   #ifdef ENABLE_MQTT_HOSTNAME_CHIPID
     snprintf(mqtt_clientid, 64, "%s-%08X", HOSTNAME, ESP.getChipId());
   #endif
@@ -590,14 +581,7 @@ void setup() {
       connectToMqtt();
     }
   #endif
-
-  // #ifdef ENABLE_HOMEASSISTANT
-  //   ha_send_data.attach(5, tickerSendState); // Send HA data back only every 5 sec
-  // #endif
-
-  // ***************************************************************************
-  // Setup: MDNS responder
-  // ***************************************************************************
+# 601 "/Users/matthiaskleine/Dev/PlatformIO/McLighting/Arduino/McLighting/McLighting.ino"
   bool mdns_result = MDNS.begin(HOSTNAME);
 
   DBG_OUTPUT_PORT.print("Open http://");
@@ -615,28 +599,28 @@ void setup() {
   DBG_OUTPUT_PORT.println("");
 
 
-  // ***************************************************************************
-  // Setup: WebSocket server
-  // ***************************************************************************
+
+
+
   webSocket.begin();
   webSocket.onEvent(webSocketEvent);
 
-  // ***************************************************************************
-  // Setup: SPIFFS Webserver handler
-  // ***************************************************************************
-  //list directory
+
+
+
+
   server.on("/list", HTTP_GET, handleFileList);
-  //create file
+
   server.on("/edit", HTTP_PUT, handleFileCreate);
-  //delete file
+
   server.on("/edit", HTTP_DELETE, handleFileDelete);
-  //first callback is called after the request has ended with all parsed arguments
-  //second callback handles file uploads at that location
+
+
   server.on("/edit", HTTP_POST, []() {
     server.sendHeader("Access-Control-Allow-Origin", "*");
     server.send(200, "text/plain", "");
   }, handleFileUpload);
-  //get heap status, analog input value and all GPIO statuses in one json call
+
   server.on("/esp_status", HTTP_GET, []() {
     DynamicJsonDocument jsonBuffer(JSON_OBJECT_SIZE(21) + 1500);
     JsonObject json = jsonBuffer.to<JsonObject>();
@@ -727,8 +711,8 @@ void setup() {
 #endif
   });
 
-  //called when the url is not defined here
-  //use it to load content from SPIFFS
+
+
   server.onNotFound([]() {
     if (!handleFileRead(server.uri()))
       handleNotFound();
@@ -761,12 +745,12 @@ void setup() {
   });
 
 
-  // ***************************************************************************
-  // Setup: SPIFFS Webserver handler
-  // ***************************************************************************
+
+
+
   server.on("/set_brightness", []() {
     getArgs();
-	mode = BRIGHTNESS;
+ mode = BRIGHTNESS;
     #ifdef ENABLE_MQTT
     mqtt_client.publish(mqtt_outtopic, String(String("OK %") + String(brightness)).c_str());
     #endif
@@ -775,7 +759,7 @@ void setup() {
     #endif
     #ifdef ENABLE_HOMEASSISTANT
       stateOn = true;
-      if(!ha_send_data.active())  ha_send_data.once(5, tickerSendState);
+      if(!ha_send_data.active()) ha_send_data.once(5, tickerSendState);
     #endif
     #ifdef ENABLE_STATE_SAVE_SPIFFS
       if(!spiffs_save_state.active()) spiffs_save_state.once(3, tickerSpiffsSaveState);
@@ -803,7 +787,7 @@ void setup() {
       amqttClient.publish(mqtt_outtopic, qospub, false, String(String("OK ?") + String(ws2812fx_speed)).c_str());
       #endif
       #ifdef ENABLE_HOMEASSISTANT
-        if(!ha_send_data.active())  ha_send_data.once(5, tickerSendState);
+        if(!ha_send_data.active()) ha_send_data.once(5, tickerSendState);
       #endif
     }
 
@@ -838,20 +822,7 @@ void setup() {
   });
 
   server.on("/pixelconf", []() {
-
-    /*
-
-    // This will be used later when web-interface is ready and HTTP_GET will not be allowed to update the Strip Settings
-
-    if(server.args() == 0 and server.method() != HTTP_POST)
-    {
-      server.sendHeader("Access-Control-Allow-Origin", "*");
-      server.send(200, "text/plain", "Only HTTP POST method is allowed and check the number of arguments!");
-      return;
-    }
-
-    */
-
+# 855 "/Users/matthiaskleine/Dev/PlatformIO/McLighting/Arduino/McLighting/McLighting.ino"
     bool updateStrip = false;
     if(server.hasArg("ct")){
       uint16_t pixelCt = server.arg("ct").toInt();
@@ -963,7 +934,7 @@ void setup() {
     #endif
     ws2812fx_mode = FX_MODE_STATIC;
     mode = SET_MODE;
-    //mode = ALL;
+
     getArgs();
     getStatusJSON();
     #ifdef ENABLE_MQTT
@@ -1153,7 +1124,7 @@ void setup() {
     #endif
     #ifdef ENABLE_HOMEASSISTANT
       stateOn = true;
-      if(!ha_send_data.active())  ha_send_data.once(5, tickerSendState);
+      if(!ha_send_data.active()) ha_send_data.once(5, tickerSendState);
     #endif
     #ifdef ENABLE_STATE_SAVE_SPIFFS
       if(!spiffs_save_state.active()) spiffs_save_state.once(3, tickerSpiffsSaveState);
@@ -1166,15 +1137,15 @@ void setup() {
 
   server.begin();
 
-  // Start MDNS service
+
   if (mdns_result) {
     MDNS.addService("http", "tcp", 80);
   }
 
   #ifdef ENABLE_E131
-  // Choose one to begin listening for E1.31 data
-  // if (e131.begin(E131_UNICAST))                             // Listen via Unicast
-  if (e131.begin(E131_MULTICAST, START_UNIVERSE, END_UNIVERSE)) // Listen via Multicast
+
+
+  if (e131.begin(E131_MULTICAST, START_UNIVERSE, END_UNIVERSE))
       Serial.println(F("E1.31 mode setup complete."));
   else
       Serial.println(F("*** e131.begin failed ***"));
@@ -1183,7 +1154,7 @@ void setup() {
     (readStateFS()) ? DBG_OUTPUT_PORT.println(" Success!") : DBG_OUTPUT_PORT.println(" Failure!");
   #endif
   #ifdef ENABLE_STATE_SAVE_EEPROM
-    // Load state string from EEPROM
+
     String saved_state_string = readEEPROM(256, 32);
     String chk = getValue(saved_state_string, '|', 0);
     if (chk == "STA") {
@@ -1237,11 +1208,11 @@ void loop() {
     }
   #endif
   #ifdef ENABLE_HOMEASSISTANT
-//   if(!ha_send_data.active())  ha_send_data.once(5, tickerSendState);
+
    if (new_ha_mqtt_msg) sendState();
   #endif
 
-  // Simple statemachine that handles the different modes
+
   if (mode == SET_MODE) {
     DBG_OUTPUT_PORT.printf("SET_MODE: %d %d\n", ws2812fx_mode, mode);
     if(strip) strip->setMode(ws2812fx_mode);
@@ -1251,8 +1222,8 @@ void loop() {
   }
   if (mode == OFF) {
     if(strip){
-      if(strip->isRunning()) strip->stop(); //should clear memory
-      // mode = HOLD;
+      if(strip->isRunning()) strip->stop();
+
     }
   }
   if (mode == SETCOLOR) {
@@ -1333,7 +1304,7 @@ void loop() {
     }
   #endif
 
-  // Only for modes with WS2812FX functionality
+
   #ifdef ENABLE_LEGACY_ANIMATIONS
   if (mode != TV && mode != CUSTOM) {
   #else
@@ -1349,11 +1320,11 @@ void loop() {
   #endif
 
   #ifdef ENABLE_STATE_SAVE_EEPROM
-    // Check for state changes
+
     sprintf(current_state, "STA|%2d|%3d|%3d|%3d|%3d|%3d|%3d", mode, strip->getMode(), ws2812fx_speed, brightness, main_color.red, main_color.green, main_color.blue);
 
     if (strcmp(current_state, last_state) != 0) {
-      // DBG_OUTPUT_PORT.printf("STATE CHANGED: %s / %s\n", last_state, current_state);
+
       strcpy(last_state, current_state);
       time_statechange = millis();
       state_save_requested = true;
@@ -1361,8 +1332,9 @@ void loop() {
     if (state_save_requested && time_statechange + timeout_statechange_save <= millis()) {
       time_statechange = 0;
       state_save_requested = false;
-      writeEEPROM(256, 32, last_state); // 256 --> last_state (reserved 32 bytes)
+      writeEEPROM(256, 32, last_state);
       EEPROM.commit();
     }
   #endif
 }
+# 1 "/Users/matthiaskleine/Dev/PlatformIO/McLighting/Arduino/McLighting/version_info.ino"

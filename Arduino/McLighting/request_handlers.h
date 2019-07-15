@@ -1395,9 +1395,6 @@ bool readStateFS() {
 }
 #endif
 
-//Strip Config
-char strip_size[4], led_pin[3]; //needed for WiFiManager Settings
-
 struct
 {
   uint16_t stripSize = NUMLEDS;
